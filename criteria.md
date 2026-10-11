@@ -42,62 +42,55 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. False Positives
 
-<!-- Your criterion. It must name a number. -->
-
+Human writing should get called AI only less than 5% of the time.
 
 
 **Why this target:**
+It is very detrimental to label someone's actual work as AI. This could lose trust in the product/program. For this reason, want to keep it very low. 
 
+---
+
+## 2. Score Spread
+
+Clearly AI text scores at least 0.20 higher than clearly human text on average.
+
+**Why this target:**
+There needs to be a large enough gap between clearly AI and clearly human. Don't want them mixing together, which could lead to misclassifications. 
 
 
 ---
 
-## 2.
+## 3. Label Coverage
 
-<!-- Your criterion. -->
-
+All 3 labels (AI, human, unsure) are reached at least once in each trial.
 
 
 **Why this target:**
-
+All the labels should be reached, or there will be a problem when that isn't the case (not given full decision path). It means the system is collapsing casse into only two outcomes or failing to handle uncertain text at all.
 
 
 ---
 
-## 3.
+## 4. The Appeal Path
 
-<!-- Your criterion. -->
-
+100% of appeals change status and are logged with a record.
 
 
 **Why this target:**
-
+An appeal system is only useful if it produces a visible result and keeps an audit trail. If the status does not change or the event is not recorded, the system cannot support fairness or review.
 
 
 ---
 
-## 4.
+## 5. Bad Input
 
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
-
----
-
-## 5.
-
-<!-- Your criterion. -->
-
+Missing or empty text is rejected; input over 10,000–20,000 characters is rejected or safely truncated.
 
 
 **Why this target:**
-
+Bad input can break the model or create meaningless results. A clear limit prevents crashes and keeps the service reliable under real-world misuse.
 
 
 ---

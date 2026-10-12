@@ -64,8 +64,10 @@ def sentence_length_spread(text: str) -> float:
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
     """
-    # TODO: replace this
-    return 0.0
+    s_lengths = [len(words(sentence)) for sentence in sentences(text)]
+    if len(s_lengths) < 2:
+        return 0.0
+    return statistics.stdev(s_lengths) / statistics.mean(s_lengths)
 
 
 def type_token_ratio(text: str) -> float:
@@ -80,8 +82,10 @@ def type_token_ratio(text: str) -> float:
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
     """
-    # TODO: replace this
-    return 0.0
+    w = words(text)
+    if not w:
+        return 0.0
+    return len(set(w)) / len(w)
 
 
 def punctuation_density(text: str) -> float:
@@ -94,8 +98,11 @@ def punctuation_density(text: str) -> float:
         more interesting than full stops, because they vary more between
         writers.
     """
-    # TODO: replace this
-    return 0.0
+    punc_count = sum(1 for c in text if c in ",;—")
+    total_chars = len(text)
+    if total_chars == 0:
+        return 0.0
+    return punc_count / total_chars
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -122,8 +129,16 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    spread = sentence_length_spread(text)
+    ttr = type_token_ratio(text)
+    punc = punctuation_density(text)
+
+    # Combine them with equal weighting for now
+
+    # scale the punc
+    punc = punc / (1 + punc)  # scale punctuation density to 0-1 range
+    combined = (1 / spread + (1 - ttr) + punc) / 3
+    return combined
 
 
 if __name__ == "__main__":

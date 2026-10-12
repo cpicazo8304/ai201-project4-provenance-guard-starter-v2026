@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+from time import time
 import uuid
 
 from flask import Flask, jsonify, request
@@ -201,15 +202,52 @@ def submit():
     """
     payload = request.get_json(silent=True) or {}
 
-    # TODO: delete this and build the route.
-    return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+    # command: curl.exe -X POST http://localhost:5000/submit -H "Content-Type: application/json" -d "{\"text\": \"I’m an AI language model trained by OpenAI. I can help answer questions, summarize text, or draft emails in a clear, professional style.\", \"creator_id\": \"158943\"}"
+
+    try:
+        text = payload.get("text", "")
+        creator_id = payload.get("creator_id", "")
+        content_id = uuid.uuid4().hex
+
+        import detector
+        import stylometry
+        import scoring
+
+        # Compute the model score and combined score
+        model_score = detector.model_signal(text)
+        style_score = stylometry.style_signal(text)
+        combined_score = scoring.combine_signals(model_score, style_score)
+
+        # Log the decision for auditing purposes
+        audit.log_decision(
+            content_id=content_id,
+            creator_id=creator_id,
+            text=text,
+            model_score=model_score,
+            style_score=style_score,
+            combined_score=combined_score,
+            confidence=combined_score,
+            label=scoring.score_to_label(combined_score)[1],
+            guess=scoring.score_to_label(combined_score)[0],
+            timeframe=time(),
+            status="submitted"
+        )  
+
+        # Return the response to the client
+        return jsonify({
+                "content_id": content_id,
+                "guess": scoring.score_to_label(combined_score)[0],
+                "confidence": combined_score,
+                "label": scoring.score_to_label(combined_score)[1],
+                "model_score": model_score,
+                "style_score": style_score,
+            })
+    except Exception as e:
+        return jsonify({
+            "error": "invalid_payload",
+            "message": str(e),
+            "you_sent": payload,
+        }), 400
 
 
 @app.post("/appeal")
@@ -234,12 +272,34 @@ def appeal():
     """
     payload = request.get_json(silent=True) or {}
 
-    # TODO: delete this and build the route.
-    return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+    try:
+        content_id = payload["content_id"]
+        reasoning = payload["reasoning"]
+
+        entries = audit.entries_for(content_id)
+        if not entries:
+            return jsonify({
+                "error": "content_not_found",
+                "message": f"No content found with ID {content_id}.",
+                "you_sent": payload,
+            }), 404
+
+        audit.log_appeal(
+            content_id=content_id,
+            creator_id=entries[0]["creator_id"],
+            reasoning=reasoning
+        )
+
+        return jsonify({
+            "message": "Appeal submitted successfully.",
+            "content_id": content_id,
+        })
+    except Exception as e:
+        return jsonify({
+            "error": "invalid_payload",
+            "message": str(e),
+            "you_sent": payload,
+        }), 400
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

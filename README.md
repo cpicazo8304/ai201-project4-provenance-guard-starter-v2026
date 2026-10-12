@@ -36,52 +36,43 @@
 
 ## What This Does
 
-<!-- The path a submission takes, from arriving to the label a reader sees.
-     Six or seven steps — this is the trace you wrote in Milestone 1. -->
-
-
+- HTTP request: receives the submission as JSON.
+- JSON parsing and validation: extracts text and creator_id; rejects missing or invalid input.
+- Model signal: detector.py estimates how predictable the text is.
+- Style signal: stylometry.py measures its surface patterns.
+- Combiner: scoring.py combines the two 0–1 signals into one score.
+- Labeler: compares the score with the thresholds in config.py and creates a reader-facing label.
+- Audit and response: records the decision and returns the label and scores to the caller.
 
 ---
 
 ## Signals and Scoring
 
-<!-- For each signal: what property it measures, why that might differ between
-     human and AI writing, and WHAT IT CAN'T SEE.
-
-     The blind spot is not optional. If you can't name it you don't understand
-     the signal yet — and unit 8's attack set is built out of blind spots. -->
-
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** Measures text predictability to the local language model
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** AI-generated text may be more predictable because models tend to choose likely next words. 
 
-**What it can't see:**
+**What it can't see:** who wrote it. Plain, conventional human writing can also be predictable; unusual AI text can be surprising.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** Intended to measure sentence-length variation, vocabulary repetition, and punctuation patterns
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:**generated text may be more even or repetitive.
 
-**What it can't see:**
+**What it can't see:**meaning or authorship. Quotations, edits, or deliberate formatting changes can alter its measurements. The functions are currently stubs.
 
 ### The combining rule
 
-<!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? -->
+**The rule:** I combine the model and style scores with a weighted average. Since the model signal is somewhat lenient about calling text AI-generated and tends to score it lower, the style signal gets more influence. When the signals disagree, the combined score leans toward the style signal.
 
-**The rule:**
-
-**The numbers:**
+**The numbers:** `0.35 × model_score + 0.65 × style_score`
 
 **Where it lives:** `scoring.py::combine_signals`
 
-<!-- ⚠️ The grader checks your code against that line. If your rule lives
-     somewhere else, say where. -->
-
-**A case where my two signals split, and what my rule does with it:**
+**A case where my two signals split, and what my rule does with it:** If the model score is 0.20 and the style score is 0.80, the combined score is 0.59, so it leans toward the style signal but remains unsure.
 
 
 
@@ -89,21 +80,13 @@
 
 ## Label Variants
 
-<!-- The exact text of all three labels, as a reader would see them, and the
-     score range each covers.
-
-     Write them for someone who has never heard the word "threshold". -->
-
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 - 0.35 | We think this was probably written by a person. |
+| unsure | 0.35 - 0.60 | We’re not sure whether this was written by a person or by AI. |
+| high-confidence AI | 0.60 - 1.00 | We think this was probably written by an AI. |
 
-**Why I worded the "unsure" one this way:**
-<!-- It's the hardest of the three. It has to admit uncertainty without
-     sounding like an accusation, because the person reading it may well have
-     written every word themselves. -->
+**Why I worded the "unsure" one this way:**This works because it claims uncertainty without accusing the writer. 
 
 
 
@@ -159,15 +142,15 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Help explaining how to combine the model and style signals when the model score is too lenient.
+- *What came back:* A suggestion to use a weighted average and give more weight to the style signal.
+- *What I changed:* I chose weights of 0.35 for the model and 0.65 for style, then updated the rule in my README and config.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Help wording the unsure label so it would not sound accusatory.
+- *What came back:* “We’re not sure whether this was written by a person or by AI.”
+- *What I changed:* I chose a short, neutral statement that communicates uncertainty without blaming the writer.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 

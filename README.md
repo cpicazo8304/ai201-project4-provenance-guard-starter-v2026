@@ -107,11 +107,18 @@
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "The commas are not the problem: the text is already wrapped in quotes, so commas inside it are treated as part of the text. I checked labels.csv and found the rows are missing valid labels:", "creator_id": "158943"}'
 ```
 
 ```json
-
+{
+  "confidence": 0.6660214253151155,
+  "content_id": "3c40901101ae457e8ca69530936d0ff6",
+  "guess": "ai",
+  "label": "We think this was probably written by an AI.",
+  "model_score": 0.4317,
+  "style_score": 0.7921945004847931
+}
 ```
 
 **An appeal**
@@ -123,7 +130,10 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 ```
 
 ```json
-
+{
+  "content_id": "3c40901101ae457e8ca69530936d0ff6",
+  "message": "Appeal submitted successfully."
+}
 ```
 
 **What the log shows afterwards**
@@ -133,7 +143,75 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
-
+{
+  "count": 5,
+  "entries": [
+    {
+      "combined_score": 0.12715,
+      "confidence": "your_confidence_here",
+      "content_id": "8bccca4c7f624064a10c5b89d69d613e",
+      "creator_id": "158943",
+      "guess": "your_guess_here",
+      "label": "your_label_here",
+      "model_score": 0.2543,
+      "status": "submitted",
+      "style_score": 0.0,
+      "text": "I am an AI language model trained by OpenAI. I can help answer questions, summarize text, or draft emails in a clear, professional style.",
+      "timeframe": 1791773490.6570644,
+      "timestamp": "2026-10-12T02:51:30+00:00"
+    },
+    {
+      "combined_score": 0.12715,
+      "confidence": "your_confidence_here",
+      "content_id": "dee63f6f675a4548bb048a677eff7652",
+      "creator_id": "158943",
+      "guess": "your_guess_here",
+      "label": "your_label_here",
+      "model_score": 0.2543,
+      "status": "submitted",
+      "style_score": 0.0,
+      "text": "I am an AI language model trained by OpenAI. I can help answer questions, summarize text, or draft emails in a clear, professional style.",
+      "timeframe": 1791776366.6367726,
+      "timestamp": "2026-10-12T03:39:26+00:00"
+    },
+    {
+      "combined_score": 0.21585,
+      "confidence": "your_confidence_here",
+      "content_id": "53bc3c16a8d0421a91cd2162a2e61753",
+      "creator_id": "158943",
+      "guess": "your_guess_here",
+      "label": "your_label_here",
+      "model_score": 0.4317,
+      "status": "submitted",
+      "style_score": 0.0,
+      "text": "The commas are not the problem: the text is already wrapped in quotes, so commas inside it are treated as part of the text. I checked labels.csv and found the rows are missing valid labels:",
+      "timeframe": 1791776448.7375565,
+      "timestamp": "2026-10-12T03:40:48+00:00"
+    },
+    {
+      "combined_score": 0.6660214253151155,
+      "confidence": 0.6660214253151155,
+      "content_id": "3c40901101ae457e8ca69530936d0ff6",
+      "creator_id": "158943",
+      "guess": "ai",
+      "label": "We think this was probably written by an AI.",
+      "model_score": 0.4317,
+      "status": "submitted",
+      "style_score": 0.7921945004847931,
+      "text": "The commas are not the problem: the text is already wrapped in quotes, so commas inside it are treated as part of the text. I checked labels.csv and found the rows are missing valid labels:",
+      "timeframe": 1791779056.2631078,
+      "timestamp": "2026-10-12T04:24:16+00:00"
+    },
+    {
+      "content_id": "3c40901101ae457e8ca69530936d0ff6",
+      "creator_id": "158943",
+      "event": "appeal",
+      "reasoning": "I was responding to an assingment.",
+      "status": "under_review",
+      "timestamp": "2026-10-12T04:29:27+00:00"
+    }
+  ]
+}
 ```
 
 ---

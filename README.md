@@ -105,8 +105,8 @@
      diagnostics. -->
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
-  -H "Content-Type: application/json" \
+$ curl -X POST http://127.0.0.1:5000/submit 
+  -H "Content-Type: application/json" 
   -d '{"text": "The commas are not the problem: the text is already wrapped in quotes, so commas inside it are treated as part of the text. I checked labels.csv and found the rows are missing valid labels:", "creator_id": "158943"}'
 ```
 
@@ -236,13 +236,10 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 10 per minute, 200 per day
 
 **Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+These values are meant to be easy for a real person and hard for an automated flood. A normal writer might submit a few pieces an hour, so 10 per minute is a comfortable ceiling; 200 per day still leaves room for serious work without letting a script hammer the service. But a bot trying to probe thresholds or spam variations will hit the limit quickly, and the daily cap makes long attack runs expensive and obvious.
 
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
@@ -253,7 +250,15 @@ can look like one. -->
 <!-- python run_attacks.py --flood 15 -->
 
 ```
+# Rate limit check
 
+- Produced by: `run_attacks.py::run_flood`
+- 15 submissions as `flood_tester` · 2026-10-19 01:15
+- Rate limited: **2**
+
+```
+ReadTimeout 400 200 200 200 200 200 200 200 200 200 200 200 429 429
+```
 ```
 
 ---
@@ -286,16 +291,154 @@ whose work got caught by it:
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. my own writing | human writing called AI < 5% of time|   |   |   | MISS |
+| 2. score spread | clearly AI >= 20 over clearly human | MISS  | MISS | MISS  | MISS |
+| 3. label coverage | all three labels reached at least once  |   |   |   | MISS |
+| 4. appeal path | 100% appeals change status and logged | 100%  | 100%  | 100%  | MET |
+| 5. bad input | error message 100% of the time | 0% | 0% | 0% | MISS |
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
+**Criterion 1:**
+
 ```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.558079835327398,
+    "model_score": 0.5298,
+    "style_score": 0.5733074389652277,
+    "label": "We're not sure whether this was written by a person or an AI.",
+    "sent": "What drove me was knowing that technical skills alone won't get someon"
+  }
+]
+```
+
+**Criterion 2:**
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 1.705111943076081,
+    "model_score": 0.5036,
+    "style_score": 2.35207991242474,
+    "label": "We think this was probably written by an AI.",
+    "sent": "A strong learning environment helps students develop both technical kn"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.558079835327398,
+    "model_score": 0.5298,
+    "style_score": 0.5733074389652277,
+    "label": "We're not sure whether this was written by a person or an AI.",
+    "sent": "What drove me was knowing that technical skills alone won't get someon"
+  }
+]
+
+```
+
+
+
+**Criterion 3:**
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 1.705111943076081,
+    "model_score": 0.5036,
+    "style_score": 2.35207991242474,
+    "label": "We think this was probably written by an AI.",
+    "sent": "A strong learning environment helps students develop both technical kn"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.558079835327398,
+    "model_score": 0.5298,
+    "style_score": 0.5733074389652277,
+    "label": "We're not sure whether this was written by a person or an AI.",
+    "sent": "What drove me was knowing that technical skills alone won't get someon"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 1.2661923528310113,
+    "model_score": 0.644,
+    "style_score": 1.601219004355402,
+    "label": "We think this was probably written by an AI.",
+    "sent": "I like the idea, although I am not completely sure it will work in eve"
+  }
+]
+
+```
+
+
+**Criterion 4:**
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.558079835327398,
+    "model_score": 0.5298,
+    "style_score": 0.5733074389652277,
+    "label": "We're not sure whether this was written by a person or an AI.",
+    "sent": "What drove me was knowing that technical skills alone won't get someon",
+    "appeal_status": 200,
+    "appeal_response": {
+      "content_id": "78e6e714f88b41c193612dd1b666a0c0",
+      "message": "Appeal submitted successfully."
+    },
+    "appeal_logged": true
+  }
+]
+```
+
+**Criterion 5:**
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"text\": null, \"creator_id\": \"eval_bad_null\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "word word word word word word word word word word word word word word "
+  }
+]
 
 ```
 

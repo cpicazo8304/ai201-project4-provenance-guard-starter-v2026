@@ -8,8 +8,8 @@ across the score range. One about the appeal path needs a real content_id.
 Working that out is Milestone 3's first step, and this file is where you write
 it down. `run_eval.py` runs everything here three times.
 
-Two are filled in as examples. Replace them with what your criteria actually
-need — these are a shape, not a set.
+Each criterion has a scenario below. Replace or expand the example inputs to
+match your own criteria and writing.
 
 A scenario carries **either** of these:
 
@@ -20,51 +20,111 @@ A scenario carries **either** of these:
               when the malformed request IS the point — empty text, no `text`
               field at all, something enormous. A bad-input criterion needs it,
               because you cannot express "the field is missing" as a string.
+
+    "appeal_reasoning"  optional text. When present, run_eval.py appeals each
+              successful submission and checks the audit log for under_review.
 """
 
 SCENARIOS = [
     {
         "name": "my own writing",
         "criterion": 1,
-        # ⚠️ PUT YOUR OWN WRITING HERE. Not AI text, not a sample from the web —
-        # things you actually wrote. This is the criterion that matters most and
-        # it's meaningless with someone else's prose.
+        # Add more of your own writing here for a meaningful estimate of a
+        # false-positive rate; this sample alone only gives a coarse check.
         "texts": [
-            "REPLACE ME with a paragraph you wrote yourself.",
-            "REPLACE ME with another one. Ten pieces is the usual number.",
+            (
+                "What drove me was knowing that technical skills alone won't "
+                "get someone hired or keep them in a role. As a student myself "
+                "for another course in the same pathway, I understand that the "
+                "ability to communicate with a teammate, speak up in a meeting, "
+                "or push back on an idea respectfully are skills students need "
+                "to practice before they enter the workforce. I wanted to give "
+                "them a safe environment to build that muscle."
+            ),
+        ],
+    },
+    {
+        "name": "score spread",
+        "criterion": 2,
+        "texts": [
+            (
+                "A strong learning environment helps students develop both "
+                "technical knowledge and professional communication skills. "
+                "By practicing collaboration, clear discussion, and respectful "
+                "disagreement, learners can build confidence before entering "
+                "the workplace. These experiences support individual growth "
+                "and help teams solve problems more effectively."
+            ),
+            (
+                "What drove me was knowing that technical skills alone won't "
+                "get someone hired or keep them in a role. As a student myself "
+                "for another course in the same pathway, I understand that the "
+                "ability to communicate with a teammate, speak up in a meeting, "
+                "or push back on an idea respectfully are skills students need "
+                "to practice before they enter the workforce. I wanted to give "
+                "them a safe environment to build that muscle."
+            ),
         ],
     },
     {
         "name": "label coverage",
-        "criterion": 2,
-        # Inputs spread across your score range, so you can check all three
-        # labels are actually reachable.
+        "criterion": 3,
         "texts": [
-            "REPLACE ME with something you're confident is AI-generated.",
-            "REPLACE ME with something you're confident is human-written.",
-            "REPLACE ME with something genuinely borderline.",
+            (
+                "A strong learning environment helps students develop both "
+                "technical knowledge and professional communication skills. "
+                "By practicing collaboration, clear discussion, and respectful "
+                "disagreement, learners can build confidence before entering "
+                "the workplace. These experiences support individual growth "
+                "and help teams solve problems more effectively."
+            ),
+            (
+                "What drove me was knowing that technical skills alone won't "
+                "get someone hired or keep them in a role. As a student myself "
+                "for another course in the same pathway, I understand that the "
+                "ability to communicate with a teammate, speak up in a meeting, "
+                "or push back on an idea respectfully are skills students need "
+                "to practice before they enter the workforce. I wanted to give "
+                "them a safe environment to build that muscle."
+            ),
+            (
+                "I like the idea, although I am not completely sure it will "
+                "work in every class. Students need time to practice, but some "
+                "may be uncomfortable speaking up at first. A small group "
+                "activity could help; the instructor can observe what happens "
+                "and adjust the next session based on the feedback."
+            ),
         ],
     },
-    # A bad-input criterion looks like this. Uncomment and adjust if that's one
-    # of your five — these are raw request bodies, sent exactly as written.
-    #
-    # {
-    #     "name": "bad input",
-    #     "criterion": 3,
-    #     "bodies": [
-    #         {"text": "", "creator_id": "eval_bad_empty"},
-    #         {"creator_id": "eval_bad_missing"},          # no text field at all
-    #         {"text": "word " * 50000, "creator_id": "eval_bad_huge"},
-    #         {"text": None, "creator_id": "eval_bad_null"},
-    #     ],
-    # },
-
-    # TODO: add what your remaining criteria need.
-    #
-    # A criterion about the appeal path can't be tested by sending text alone;
-    # it needs a submission first and then an appeal against the content_id
-    # that came back. You'll need to test that one by hand, or extend this file
-    # and run_eval.py to do it. Saying which you did is part of the write-up.
+    {
+        "name": "appeal path",
+        "criterion": 4,
+        "texts": [
+            (
+                "What drove me was knowing that technical skills alone won't "
+                "get someone hired or keep them in a role. As a student myself "
+                "for another course in the same pathway, I understand that the "
+                "ability to communicate with a teammate, speak up in a meeting, "
+                "or push back on an idea respectfully are skills students need "
+                "to practice before they enter the workforce. I wanted to give "
+                "them a safe environment to build that muscle."
+            ),
+        ],
+        "appeal_reasoning": (
+            "I wrote this submission myself and would like a person to review "
+            "the decision."
+        ),
+    },
+    {
+        "name": "bad input",
+        "criterion": 5,
+        "bodies": [
+            {"text": "", "creator_id": "eval_bad_empty"},
+            {"creator_id": "eval_bad_missing"},
+            {"text": None, "creator_id": "eval_bad_null"},
+            {"text": "word " * 4001, "creator_id": "eval_bad_over_limit"},
+        ],
+    },
 ]
 
 

@@ -68,9 +68,9 @@ All 3 labels (AI, human, unsure) are reached at least once in each trial.
 
 
 **Why this target:**
-All the labels should be reached, or there will be a problem when that isn't the case (not given full decision path). It means the system is collapsing casse into only two outcomes or failing to handle uncertain text at all.
+All the labels should be reached, or there will be a problem when that isn't the case (not given full decision path). It means the system is collapsing case into only two outcomes or failing to handle uncertain text at all.
 
-
+**Revision:** All scores were
 ---
 
 ## 4. The Appeal Path
@@ -86,12 +86,15 @@ An appeal system is only useful if it produces a visible result and keeps an aud
 
 ## 5. Bad Input
 
-Missing or empty text is rejected; input over 10,000–20,000 characters is rejected or safely truncated.
+Missing or empty text is rejected; input over 10,000–20,000 characters is rejected or safely truncated 100% of the time.
 
 
 **Why this target:**
 Bad input can break the model or create meaningless results. A clear limit prevents crashes and keeps the service reliable under real-world misuse.
 
+**Revision:** Missing or empty text, input over 10,000-20,000 characters is rejected or safely truncated. A specific message is given to know which error was given 100% of the time.
+
+**Why the change:** Having a specific message can help diagnose the issue and help anyone using the system to reconstruct their submission. 
 
 ---
 

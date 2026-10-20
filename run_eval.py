@@ -11,7 +11,8 @@ to test, and the two rarely overlap much. Both count.
 
 Fill in `scenarios.py` first — that's where you say what each criterion needs
 run against it. A criterion about false positives needs your own writing. One
-about label coverage needs inputs across the score range.
+about label coverage needs inputs across the score range. An appeal scenario
+can set `appeal_reasoning` to submit an appeal and verify its audit-log entry.
 
 !! Three trials, and **your first signal runs a model, so identical input can
 score differently twice.** That's exactly why repeats matter here.
@@ -119,7 +120,7 @@ def main():
                     response = requests.post(f"{args.url}/submit", json=body,
                                              timeout=args.timeout)
                     payload = response.json() if response.content else {}
-                    results.append({
+                    result = {
                         "status": response.status_code,
                         "guess": payload.get("guess"),
                         "confidence": payload.get("confidence"),
@@ -127,7 +128,46 @@ def main():
                         "style_score": payload.get("style_score"),
                         "label": payload.get("label"),
                         "sent": preview,
-                    })
+                    }
+
+                    reasoning = scenario.get("appeal_reasoning")
+                    content_id = payload.get("content_id")
+                    if reasoning and response.ok and content_id:
+                        try:
+                            appeal_response = requests.post(
+                                f"{args.url}/appeal",
+                                json={"content_id": content_id, "reasoning": reasoning},
+                                timeout=args.timeout,
+                            )
+                            appeal_payload = (
+                                appeal_response.json() if appeal_response.content else {}
+                            )
+                            result["appeal_status"] = appeal_response.status_code
+                            result["appeal_response"] = appeal_payload
+
+                            if appeal_response.ok:
+                                log_response = requests.get(
+                                    f"{args.url}/log", timeout=5
+                                )
+                                log_payload = (
+                                    log_response.json() if log_response.content else {}
+                                )
+                                entries = log_payload.get("entries", [])
+                                matching_appeals = [
+                                    entry for entry in entries
+                                    if entry.get("content_id") == content_id
+                                    and entry.get("event") == "appeal"
+                                ]
+                                result["appeal_logged"] = any(
+                                    entry.get("status") == "under_review"
+                                    for entry in matching_appeals
+                                )
+                        except (requests.RequestException, ValueError) as exc:
+                            result["appeal_check_error"] = (
+                                f"{type(exc).__name__}: {exc}"
+                            )
+
+                    results.append(result)
                 except Exception as exc:  # noqa: BLE001
                     results.append({"status": None, "error": f"{type(exc).__name__}: {exc}",
                                     "sent": preview})

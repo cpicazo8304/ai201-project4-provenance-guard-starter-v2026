@@ -152,7 +152,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -226,10 +226,8 @@ def submit():
             model_score=model_score,
             style_score=style_score,
             combined_score=combined_score,
-            confidence=combined_score,
             label=scoring.score_to_label(combined_score)[1],
             guess=scoring.score_to_label(combined_score)[0],
-            timeframe=time(),
             status="submitted"
         )  
 

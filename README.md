@@ -458,7 +458,16 @@ that produced it:
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+**Criterion 1:** Both the signal one and two didn't score well enough for the human writing. They were both unsure (the middle ground of the thresholds). So, they aren't too good in scoring human text.
 
+
+**Criterion 2:** Again, the scoring for the two signals are not good enough for human text, so cannot compare between human and AI text and check for the score spread.
+
+
+**Criterion 3:** Same issues are the the first two criteria with the human text.
+
+
+**Criterion 5:** After the revision, it makes sense that the error would be not including error messages that help diagnose the issue (empty text, null, etc.). 
 
 ---
 

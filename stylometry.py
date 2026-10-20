@@ -133,11 +133,12 @@ def style_signal(text: str) -> float:
     ttr = type_token_ratio(text)
     punc = punctuation_density(text)
 
-    # Combine them with equal weighting for now
 
-    # scale the punc
-    punc = punc / (1 + punc)  # scale punctuation density to 0-1 range
-    combined = (1 / spread + (1 - ttr) + punc) / 3
+    spread_signal = 1 / (1 + spread)
+    vocabulary_signal = 1 - ttr
+    punctuation_signal = punc / (1 + punc)
+
+    combined = (spread_signal + vocabulary_signal + punctuation_signal) / 3
     return combined
 
 

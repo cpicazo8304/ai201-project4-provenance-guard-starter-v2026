@@ -473,9 +473,9 @@ that produced it:
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** Fixed the formula for the stylo score.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** This points at criterion 1-3 so that it can help improve in classifying human text as human.
 
 ### Attack Run — After
 
@@ -485,8 +485,7 @@ that produced it:
 
 **Did it help, and how do I know:**
 
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
+It helped get the stylo score under a good range, but not it is all a similar score (0.2 to 0.3), so it is now viewing everything as human while the detector signal views varies but usually in the middle, which isn't great.
 
 
 
@@ -497,6 +496,7 @@ that produced it:
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+All the labels are unsure, so there is still a problem with the scores. I would probably dive deep into the score and see why it keeps on giving the same. It could be that the examples are not good enough, but that's too hopeful.
 
 
 **The trade I'd make if this ran for real:**
@@ -504,7 +504,7 @@ that produced it:
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
-
+I would say fewer wrong accusations because what matters the most is that we don't hurt the people that are actually turning in real text. For AI text, it doesn't hurt as much because I feel like nowadays, it will happen more than you think, and people tend to forgive more for that than for wrong accusations.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 

@@ -506,6 +506,13 @@ All the labels are unsure, so there is still a problem with the scores. I would 
 
 I would say fewer wrong accusations because what matters the most is that we don't hurt the people that are actually turning in real text. For AI text, it doesn't hurt as much because I feel like nowadays, it will happen more than you think, and people tend to forgive more for that than for wrong accusations.
 
+
+## The Shape
+I want to extend the capability of the signals. They weren't doing well identifying human text. So, I plan to go further and strengthen this so it can become much better. I want it to be able to handle longer text as well. In a way, I am kind of doing shape B since this is essentially failure handling in some type of way. 
+
+## What's out of scope.
+We couldn't touch detector.py, so I wanted to see if I can make that half better. That was out of our reach and something that was fixed while stylometry signal was more on how we designed it. I plan to fix up the stylometry part and then find a way to make the detector side better (whether through a better model, adding data that may finetune the model to identify human and AI text, or other similar ideas).
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 7

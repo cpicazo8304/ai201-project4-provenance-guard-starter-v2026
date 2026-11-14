@@ -70,40 +70,33 @@ def sentence_length_spread(text: str) -> float:
     return statistics.stdev(s_lengths) / statistics.mean(s_lengths)
 
 
-def type_token_ratio(text: str) -> float:
-    """
-    Unique words over total words. ← TODO
-
-    Returns:
-        A float between 0 and 1. Higher means more varied vocabulary.
-
-    Worth knowing before you rely on it: this measure falls as text gets
-    longer, because common words repeat. Two texts of different lengths aren't
-    directly comparable on it, and if your test inputs vary a lot in length,
-    that alone can look like a signal.
-    """
-    w = words(text)
-    if not w:
+def type_token_ratio(text: str, window_size: int = 25) -> float:
+    """Moving-average type-token ratio; higher means more varied vocabulary."""
+    word_list = words(text)
+    if not word_list:
         return 0.0
-    return len(set(w)) / len(w)
+
+    if len(word_list) <= window_size:
+        return len(set(word_list)) / len(word_list)
+
+    ratios = []
+    for window_start in range(len(word_list) - window_size + 1):
+        window = word_list[window_start:window_start + window_size]
+        ratios.append(len(set(window)) / window_size)
+
+    return statistics.mean(ratios)
 
 
 def punctuation_density(text: str) -> float:
-    """
-    How much punctuation, relative to length. ← TODO
-
-    Returns:
-        A float. Whether you count all punctuation or only some kinds — commas,
-        semicolons, dashes — is a real choice. Semicolons and em dashes are
-        more interesting than full stops, because they vary more between
-        writers.
-    """
-    punc_count = sum(1 for c in text if c in ",;—")
-    total_chars = len(text)
-    if total_chars == 0:
+    """Selected punctuation marks per 100 words; descriptive, not directional."""
+    word_count = len(words(text))
+    if not word_count:
         return 0.0
-    return punc_count / total_chars
 
+    punctuation_count = sum(
+        1 for character in text if character in ",;:!?—-"
+    )
+    return 100 * punctuation_count / word_count
 
 # ── Combining them ───────────────────────────────────────────────────────────
 
@@ -129,17 +122,16 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
+    if len(words(text)) < 25 or len(sentences(text)) < 2:
+        return 0.5
+
     spread = sentence_length_spread(text)
-    ttr = type_token_ratio(text)
-    punc = punctuation_density(text)
+    vocabulary_variety = type_token_ratio(text)
 
+    low_spread_signal = 1 / (1 + spread)
+    low_variety_signal = 1 - vocabulary_variety
 
-    spread_signal = 1 / (1 + spread)
-    vocabulary_signal = 1 - ttr
-    punctuation_signal = punc / (1 + punc)
-
-    combined = (spread_signal + vocabulary_signal + punctuation_signal) / 3
-    return combined
+    return (low_spread_signal + low_variety_signal) / 2
 
 
 if __name__ == "__main__":

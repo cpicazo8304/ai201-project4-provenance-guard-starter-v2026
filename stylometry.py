@@ -32,6 +32,8 @@ anything together:
 
 import re
 import statistics
+import traceback
+import audit
 
 
 def sentences(text: str) -> list[str]:
@@ -56,6 +58,11 @@ def sentence_length_spread(text: str) -> float:
         "more human" — then write that down, because your combining rule
         depends on knowing it.
 
+        Scale: coefficient of variation (stdev / mean of sentence lengths in
+        words). Higher = lumpier = more human. Returns NaN when there are
+        fewer than two sentences, because spread is undefined there and the
+        caller should treat it as "no evidence", not as "very even".
+
     A hint on what you're reaching for: the standard deviation of sentence
     lengths, probably divided by the mean so a long text and a short one are
     comparable. `statistics.stdev` is imported for you.
@@ -65,9 +72,13 @@ def sentence_length_spread(text: str) -> float:
     before the attack set decides for you.
     """
     s_lengths = [len(words(sentence)) for sentence in sentences(text)]
+    s_lengths = [n for n in s_lengths if n > 0]
     if len(s_lengths) < 2:
-        return 0.0
-    return statistics.stdev(s_lengths) / statistics.mean(s_lengths)
+        return float("nan")
+    mean_length = statistics.mean(s_lengths)
+    if mean_length == 0:
+        return float("nan")
+    return statistics.stdev(s_lengths) / mean_length
 
 
 def type_token_ratio(text: str, window_size: int = 25) -> float:
@@ -88,50 +99,77 @@ def type_token_ratio(text: str, window_size: int = 25) -> float:
 
 
 def punctuation_density(text: str) -> float:
-    """Selected punctuation marks per 100 words; descriptive, not directional."""
+    """Selected punctuation marks per 100 words; descriptive, not directional.
+
+    Hyphens are not counted: they mostly sit inside compound words
+    ("early-career") rather than acting as punctuation between clauses.
+    """
     word_count = len(words(text))
     if not word_count:
         return 0.0
 
     punctuation_count = sum(
-        1 for character in text if character in ",;:!?—-"
+        1 for character in text if character in ",;:!?—–"
     )
     return 100 * punctuation_count / word_count
 
+
 # ── Combining them ───────────────────────────────────────────────────────────
 
-def style_signal(text: str) -> float:
-    """
-    The style signal as a 0–1 score. **Higher means more likely AI.** ← TODO
+def bound(x: float) -> float:
+    return min(max(x, 0.0), 1.0)
 
-    Combine your three measures into one number. Same direction as
-    `detector.model_signal`, so that `scoring.combine_signals` can treat them
-    the same way — if one of your signals runs backwards, everything above it
-    is wrong in a way that's hard to see.
 
-    Two things to decide and write down:
+def style_signal(text: str, content_id: str, creator_id: str) -> tuple[float, float, float, float]:
+    """0-1, HIGHER = MORE LIKELY AI. Each measure becomes an AI-ness sub-score
+    on 0-1 first, so none wins just because its raw numbers are bigger."""
+    # No words means no evidence either way: stay neutral.
+    if not words(text):
+        return 0.5, 0.5, 0.5, 0.5
 
-      1. Which direction each measure points. Low spread means more AI-ish, so
-         it needs flipping. Work out which of your three need that.
-      2. How to get each onto a comparable scale. A raw type-token ratio sits
-         between 0 and 1; a raw punctuation count doesn't. Adding them
-         unscaled means whichever has the bigger numbers wins by default.
+    try:
+        cv = sentence_length_spread(text)
+        ttr = type_token_ratio(text)
+        punct = punctuation_density(text)
 
-    Test it on the four calibration inputs from Milestone 4 — clearly AI,
-    clearly human, plain conventional human writing, lightly-edited AI — before
-    you trust it. Plain and ordinary, not formal: formal prose reads as *human*
-    to signal one, and it is plain writing that gets accused.
-    """
-    if len(words(text)) < 25 or len(sentences(text)) < 2:
-        return 0.5
+        audit.log_stylometry(
+            content_id=content_id, 
+            creator_id=creator_id,
+            flipped=False,
+            sentence_length_spread=cv,
+            type_token_ratio=ttr,
+            punctuation_density=punct,
+            text=text,
+        )
 
-    spread = sentence_length_spread(text)
-    vocabulary_variety = type_token_ratio(text)
+        
+        # NaN (fewer than two sentences) -> neutral sub-score
+        spread_ai = 0.5 if cv != cv else bound(1.0 - cv / 0.8)         # flipped
+        # Window-based TTR sits higher (~0.7-0.95) than whole-text TTR, so the
+        # baseline/span here are placeholders: recalibrate on your own samples.
+        ttr_ai = bound(1.0 - (ttr - 0.75) / 0.20)   # flipped
+        # Density is per 100 words (~5-15 typical), so divide by 15, not 0.15.
+        # Direction (more punctuation = more AI) is an unverified assumption.
+        punct_ai = bound(punct / 15) 
+        
+        main_score =  round(0.7 * spread_ai + 0.3 * ttr_ai, 4)
 
-    low_spread_signal = 1 / (1 + spread)
-    low_variety_signal = 1 - vocabulary_variety
+        audit.log_stylometry(
+            content_id=content_id, 
+            creator_id=creator_id,
+            flipped=True,
+            sentence_length_spread=cv,
+            type_token_ratio=ttr,
+            punctuation_density=punct,
+            text=text,
+            main_score=main_score,
+        )
 
-    return (low_spread_signal + low_variety_signal) / 2
+        return main_score, spread_ai, ttr_ai, punct_ai
+    except Exception:
+        # Log the real error instead of hiding it, then fall back to neutral.
+        traceback.print_exc()
+        return 0.5, 0.5, 0.5, 0.5  # neutral fallback
 
 
 if __name__ == "__main__":
@@ -147,4 +185,3 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")

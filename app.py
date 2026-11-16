@@ -215,7 +215,7 @@ def submit():
 
         # Compute the model score and combined score
         model_score = detector.model_signal(text)
-        style_score = stylometry.style_signal(text)
+        style_score, spread_score, ttr_score, punct_score = stylometry.style_signal(text, content_id=content_id, creator_id=creator_id)
         combined_score = scoring.combine_signals(model_score, style_score)
 
         # Log the decision for auditing purposes
@@ -225,6 +225,9 @@ def submit():
             text=text,
             model_score=model_score,
             style_score=style_score,
+            spread_score=spread_score,
+            ttr_score=ttr_score,
+            punct_score=punct_score,
             combined_score=combined_score,
             label=scoring.score_to_label(combined_score)[1],
             guess=scoring.score_to_label(combined_score)[0],

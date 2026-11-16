@@ -31,6 +31,51 @@ _lock = threading.Lock()
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+def log_stylometry(
+    content_id: str,
+    creator_id: str,
+    flipped: bool,
+    spread_score: float | None = None,
+    ttr_score: float | None = None,
+    punct_score: float | None = None,
+    text: str | None = None,
+    **extra,
+) -> dict:
+    """
+    Write one stylometry analysis to the audit log.
+
+    The required fields are:
+
+        timestamp, content_id, creator_id, spread_score, ttr_score, punct_score
+
+    Anything extra you pass gets written too.
+    """
+    entry = {
+        "timestamp": _now(),
+        "content_id": content_id,
+        "creator_id": creator_id,
+        "text": text,
+        "flipped": flipped,
+        "spread_score": spread_score,
+        "ttr_score": ttr_score,
+        "punct_score": punct_score,
+    }
+    entry.update(extra)
+
+    return _append(entry)
+
+
+def add_row(path, text, label, spread, ttr, punct):
+    row = pd.DataFrame([{
+        "text": text,
+        "label": label,        # "human" or "ai"
+        "spread": spread,
+        "ttr": ttr,
+        "punct": punct,
+    }])
+    # write the header only if the file doesn't exist yet
+    row.to_csv(path, mode="a", header=not os.path.exists(path), index=False)
+
 
 def log_decision(
     content_id: str,

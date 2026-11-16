@@ -306,3 +306,66 @@ is evidence, and the entries you paste into your README are what unit 8 grades.
 
 **Do not delete and recreate this repository.** You submit the same URL both
 units.
+
+
+## Unit 9 Overview
+
+Downloading the model, running the app, etc. is the same as Unit 7-8. The following will go over the extensions.
+
+**Note for any examples to be used in curl commands:** Use any of the ones in scenario.py
+
+### Add confirmed examples
+
+The style score only uses calibrated cutoffs and weights once the dataset has
+at least 5 confirmed examples for each label (`human` and `ai`). Until then,
+the style signal returns a neutral 0.5.
+
+Confirm one example (use an ID from `ELIGIBLE_ADMINS` in config.py):
+
+    curl -X POST http://127.0.0.1:5000/confirm \
+      -H "Content-Type: application/json" \
+      -d '{
+        "content_id": "demo_human_1",
+        "admin_id": "<ADMIN_ID>",
+        "text": "Currently, I work for CodePath as a Tech Fellow...",
+        "label": "human",
+        "label_source": "reviewer"
+      }'
+
+Expected: `{"content_id": "demo_human_1", "message": "Label confirmed successfully."}`
+
+Repeat with `"label": "ai"` and different `content_id` values until there are
+at least 5 of each. The raw style scores are computed by the server from the
+text.
+
+Check that an invalid admin is rejected (expect HTTP 403):
+
+    curl -i -X POST http://127.0.0.1:5000/confirm \
+      -H "Content-Type: application/json" \
+      -d '{"content_id": "demo_bad", "admin_id": "not_an_admin", "text": "x", "label": "human", "label_source": "reviewer"}'
+      
+
+### Check the logs and dataset
+
+Go to `data.csv` to check for the data.
+
+Go to `logs/audit.jsonl` for the logs.
+
+Each confirm should appear in the log with its admin ID, label, label source,
+and scores. The rejected request should appear as a rejected admin attempt.
+
+### Submit examples
+
+Send a text to be scored:
+
+    curl -X POST http://127.0.0.1:5000/submit \
+      -H "Content-Type: application/json" \
+      -d '{"text": "Students can prepare for a first internship by...", "creator_id": "demo_user"}'
+
+The response includes the final score and label, and the style score should now
+differ from 0.5. To run every test scenario at once:
+
+    python run_eval.py
+
+Then check the log again (`tail -n 50 <LOG_PATH>`); each submission should have
+a raw stylometry entry and a result entry.

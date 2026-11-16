@@ -416,6 +416,49 @@ HUMAN_EXAMPLES = HUMAN_ESSAY_1 + HUMAN_ESSAY_2 + HUMAN_ESSAY_3 + HUMAN_ESSAY_4 +
 
 
 CLEARLY_HUMAN = HUMAN_ESSAY_3 + HUMAN_ESSAY_4
+CLEARLY_AI = AI_EXAMPLES
+
+SCENARIOS = [
+    {
+        "name": "false positives",
+        "criterion": 1,
+        # All 25 human chunks; at most 3 may come back labeled AI.
+        "texts": HUMAN_EXAMPLES,
+    },
+    # {
+    #     "name": "admin check",
+    #     "criterion": 2,
+    #     # Whole request bodies, because a missing or bad admin_id is the point.
+    #     # NOTE: field names are my guess; match them to your admin endpoint.
+    #     "bodies": [
+    #         {"content_id": "eval_admin_ok", "admin_id": "admin_1", "text": HUMAN_ESSAY_1[0], "label": "human", "label_source": "reviewer"},
+    #         {"content_id": "eval_admin_missing", "text": HUMAN_ESSAY_1[0], "label": "human", "label_source": "reviewer"},
+    #         {"content_id": "eval_admin_empty", "admin_id": "", "text": HUMAN_ESSAY_1[0], "label": "human", "label_source": "reviewer"},
+    #         {"content_id": "eval_admin_none", "admin_id": None, "text": HUMAN_ESSAY_1[0], "label": "human", "label_source": "reviewer"},
+    #         {"content_id": "eval_admin_unknown", "admin_id": "not_a_real_admin", "text": HUMAN_ESSAY_1[0], "label": "human", "label_source": "reviewer"},
+    #     ],
+    # },
+    {
+        "name": "dataset label and source",
+        "criterion": 3,
+        # All 50 examples (25 AI + 25 human), each of which should end up with
+        # a valid label and source.
+        "texts": AI_EXAMPLES + HUMAN_EXAMPLES,
+    },
+    {
+        "name": "score spread",
+        "criterion": 4,
+        # Clearly AI vs clearly human; the AI average should be at least 0.20 higher.
+        "texts": CLEARLY_AI + CLEARLY_HUMAN,
+    },
+    {
+        "name": "safe fallback with too little data",
+        "criterion": 5,
+        # A mix of both kinds. Run this against a dataset with fewer than 5
+        # examples per label; every style score should be exactly 0.5.
+        "texts": AI_CITY_HEAT[:2] + HUMAN_ESSAY_1[:2] + HUMAN_ESSAY_3[:1],
+    },
+]
 
 
 SCENARIOS = [

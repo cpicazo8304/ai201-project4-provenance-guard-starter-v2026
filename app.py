@@ -305,28 +305,45 @@ def appeal():
 
 @app.post("/confirm")
 def confirm():
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "invalid_payload",
+            "message": "Request body must be a JSON object.",
+        }), 400
+
+    # Only an admin can do this request. Missing, empty, and unknown IDs all
+    # get the same rejection.
+    admin_id = str(payload.get("admin_id") or "").strip()
+    if admin_id not in config.ELIGIBLE_ADMINS:
+        audit.log_rejected_admin(                      # placeholder: see note below
+            content_id=payload.get("content_id"),
+            admin_id=admin_id,
+        )
+        return jsonify({
+            "error": "invalid_admin",
+            "message": "You aren't an admin and can't amend dataset.",
+        }), 403
+
     try:
         content_id = payload["content_id"]
-        admin_id = payload["admin_id"]
-
-        # only admin can do this request
-        if admin_id not in config.ELIGIBLE_ADMINS:
-            return jsonify({
-                "error": "invalid_admin",
-                "message": "You aren't an admin and can't amend dataset.",
-                "you_sent": payload
-            }), 404
-
         text = payload["text"]
         label = payload["label"]
         label_source = payload["label_source"]
-        scores = payload.get("scores", {})
+
+        # Keep any extra scores the caller sent (model_score, etc.), but
+        # recompute the raw style features from the text on the server so they
+        # always match it.
+        scores = dict(payload.get("scores") or {})
+        if isinstance(text, str) and text.strip():
+            cv = stylometry.sentence_length_spread(text)
+            scores["spread"] = cv if math.isfinite(cv) else None
+            scores["ttr"] = stylometry.type_token_ratio(text)
+            scores["punct"] = stylometry.punctuation_density(text)
 
         confirmed_data_path = config.CONFIRMED_DATA_PATH
         confirmed_data_path.parent.mkdir(parents=True, exist_ok=True)
 
-        from confirmed_data import add_confirmed_example
         add_confirmed_example(
             path=confirmed_data_path,
             content_id=content_id,
@@ -334,7 +351,7 @@ def confirm():
             text=text,
             label=label,
             label_source=label_source,
-            scores=scores
+            scores=scores,
         )
 
         audit.log_add_data(
@@ -350,13 +367,16 @@ def confirm():
             "message": "Label confirmed successfully.",
             "content_id": content_id,
         })
-    except Exception as e:
+    except (KeyError, ValueError, TypeError) as e:
+        # Problem with what the caller sent
         return jsonify({
             "error": "invalid_payload",
             "message": str(e),
-            "you_sent": payload,
         }), 400
-
+    except Exception:
+        # Problem on our side: log it, don't leak details
+        app.logger.exception("confirm failed")
+        return jsonify({"error": "server_error"}), 500
 
 # ── Already works ─────────────────────────────────────────────────────────────
 

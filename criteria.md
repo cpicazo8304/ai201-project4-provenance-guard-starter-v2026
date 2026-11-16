@@ -133,31 +133,38 @@ Bad input can break the model or create meaningless results. A clear limit preve
 # Unit 9 Criteria
 
 ## 1 False Positives
-
-Human writing should get called AI only 3 of 25 examples.
-
-
+ 
+At most 3 of 25 human-written examples (12%) should be labeled AI.
+ 
 **Why this target:**
-It is very detrimental to label someone's actual work as AI. This could lose trust in the product/program. For this reason, want to keep it very low. Even with the system extension, this should hold true.
-
-## 2 Admin check
-100% of admin actions should have valid ID.
-
-**Why this target:** Every admin action such as updating the dataset needs a valid ID, so there shouldn't be missing ID or invalid IDs.
-
-
-## 3 Every dataset examples contains a label and source
-
-There are 25 examples for AI and human. Each one in the dataset should have a label correspond one of the two and contain a source of how it was confirmed.
-
-**Why:** The dataset is used to calibrate the stylometry score which depends on confirmed AI and human examples. If it is not confirmed, then there will be errors in the calculation in terms of not being able to calculate AND because of bias in the calibration numbers. If we include labels the system decide on its own (right or wrong) and don't confirm with a human reviewer or update based on an appeal, then the system will just assume its labels are correct and calibrate based on that. 
-
-
+Labeling someone's real work as AI is very damaging. It can cost the product the trust of the people it is meant to serve, so this number has to stay low. The target should still hold after the system is extended.
+ 
+## 2 Admin Check
+ 
+100% of admin actions must carry a valid admin ID.
+ 
+**Why this target:**
+Every admin action, such as confirming a label or updating the dataset, needs to be traceable to a real person. No action should have a missing or invalid ID.
+ 
+## 3 Every Dataset Example Has a Label and a Source
+ 
+The target dataset has 25 human and 25 AI examples (at least 5 per label are needed before calibration runs). Every example must have exactly one label, either `human` or `ai`, and a source that records how it was confirmed (`reviewer`, `resolved_appeal`, or `author_disclosure`).
+ 
+**Why this target:**
+The dataset is used to calibrate the style score, so it has to contain only confirmed human and AI examples. An unconfirmed example can introduce errors and bias into the cutoffs and weights. If the system's own guesses (right or wrong) were added without a human reviewer or a resolved appeal confirming them, the system would treat its own labels as correct and calibrate on them, which reinforces its mistakes.
+ 
 ## 4 Score Spread
+ 
+On average, clearly AI text should score at least 0.20 higher than clearly human text on the final combined score.
+ 
+**Why this target:**
+There needs to be a large enough gap between clearly AI and clearly human text. If the two groups overlap, borderline scores become common, which leads to misclassifications.
 
-Clearly AI text scores at least 0.20 higher than clearly human text on average.
+## 5 Safe Fallback With Too Little Data
+
+When the dataset has fewer than 5 confirmed examples for either label, the style signal returns a neutral score (0.5) 100% of the time and never errors.
 
 **Why this target:**
-There needs to be a large enough gap between clearly AI and clearly human. Don't want them mixing together, which could lead to misclassifications. 
+The cutoffs and weights are fitted from confirmed examples. With too few of them, the fit would be driven by a handful of essays and could push the score toward the wrong label. A neutral score means the style signal adds no evidence until there is enough data, so the model signal and the agreement floor decide the label. This matters most early on, when the dataset is small and a bad fit is most likely.
 
-## 5
+**How to test:** Run `style_signal` on several texts with an empty dataset, with 4 human and 4 AI examples, and with 5 human and 4 AI examples. Every score should be exactly 0.5, with no exceptions. Then add the fifth AI example and confirm the score is no longer always 0.5.

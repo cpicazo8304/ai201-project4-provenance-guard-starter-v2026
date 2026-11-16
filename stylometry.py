@@ -149,19 +149,26 @@ def style_signal(
             text=text,
         )
 
-        examples = confirmed_data.load_confirmed_examples()
-        cutoffs = confirmed_data.fit_calibration(examples=examples)
-        spread_transformed, ttr_transformed, punct_transformed = confirmed_data.calculate_transformed_values(
-            raw_spread, ttr, punct, cutoffs
+        calibration = confirmed_data.get_calibration()
+        if calibration is None:
+            return 0.5, raw_spread, ttr, punct   # not enough data: no evidence
+
+        cutoffs, (spread_weight, ttr_weight, punct_weight) = calibration
+        spread_transformed, ttr_transformed, punct_transformed = (
+            confirmed_data.calculate_transformed_values(cv, ttr, punct, cutoffs)
         )
-        spread_weight, ttr_weight, punct_weight = confirmed_data.fit_weights(examples=examples)
 
-        main_score = round(spread_weight * spread_transformed + ttr_weight * ttr_transformed + punct_weight * punct_transformed, 4)
-
+        main_score = round(
+            spread_weight * spread_transformed
+            + ttr_weight * ttr_transformed
+            + punct_weight * punct_transformed,
+            4,
+        )
         return main_score, raw_spread, ttr, punct
     except Exception:
         traceback.print_exc()
         return 0.5, None, None, None
+
 
 if __name__ == "__main__":
     import sys

@@ -15,16 +15,18 @@ FEATURE_COLUMNS = ("spread", "ttr", "punct")
 SCORE_COLUMNS = (*FEATURE_COLUMNS, "model_score", "style_score", "combined_score")
 DATASET_COLUMNS = (
     "content_id",
+    "admin_id",
     "text",
     "label",
-    "labermed_at",
-    *SCOREl_source",
-    "confi_COLUMNS,
+    "label_source",
+    "confirmed_at",
+    *SCORE_COLUMNS,
 )
+
 DEFAULT_CALIBRATION = {
     "spread": {"spread_cutoff": 0.8},
     "ttr":    {"ttr_base": 0.75, "ttr_span": 0.20},   # redo if you change the window size
-    "punc":   {"punct_div": 15},
+    "punct":   {"punct_div": 15},
 }
 MIN_EXAMPLES_PER_LABEL = 5
 
@@ -119,6 +121,8 @@ def add_confirmed_example(
         existing = existing[existing["content_id"] != content_id]
         updated = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
         updated.to_csv(dataset_path, index=False)
+
+    refresh_calibration()
     return row
 
 
@@ -161,7 +165,7 @@ def fit_calibration(examples: pd.DataFrame) -> dict:
         if min(len(human_values), len(ai_values)) < MIN_EXAMPLES_PER_LABEL:
             continue  # keep default
 
-        # Direction check: spread and ttr higher for human, punc higher for AI.
+        # Direction check: spread and ttr higher for human, punct higher for AI.
         expected_human_higher = feature in ("spread", "ttr")
         if (human_values.mean() > ai_values.mean()) != expected_human_higher:
             continue  # reversed or flat: keep default
@@ -176,7 +180,7 @@ def fit_calibration(examples: pd.DataFrame) -> dict:
             if ttr_span <= 0:
                 continue  # groups overlap too much: keep default
             feature_cutoffs[feature] = {"ttr_base": ttr_base, "ttr_span": ttr_span}
-        elif feature == "punc":
+        elif feature == "punct":
             punct_div = np.percentile(ai_values, 90)
             if punct_div <= 0:
                 continue
@@ -200,7 +204,7 @@ def calculate_transformed_values(spread, ttr, punct, cutoffs) -> tuple[float, fl
     ttr_transformed = bound(
         1.0 - (ttr - cutoffs["ttr"]["ttr_base"]) / cutoffs["ttr"]["ttr_span"]
     )
-    punct_transformed = bound(punct / cutoffs["punc"]["punct_div"])
+    punct_transformed = bound(punct / cutoffs["punct"]["punct_div"])
 
     return spread_transformed, ttr_transformed, punct_transformed
 
@@ -210,15 +214,15 @@ DEFAULT_WEIGHTS = (0.5, 0.3, 0.2)
 def fit_weights(examples: pd.DataFrame) -> tuple[float, float, float]:
     """Weight each feature by how well its raw values separate human from AI."""
     is_ai = examples["label"] == "ai"
-    # direction: spread/ttr are higher for human, punc is higher for AI
-    sign = {"spread": -1, "ttr": -1, "punc": 1}
+    # direction: spread/ttr are higher for human, punct is higher for AI
+    sign = {"spread": -1, "ttr": -1, "punct": 1}
 
     separations = []
-    for feature in ["spread", "ttr", "punc"]:
+    for feature in ["spread", "ttr", "punct"]:
         ai_vals = examples.loc[is_ai, feature].dropna()
         human_vals = examples.loc[~is_ai, feature].dropna()
         spread_sum = ai_vals.std() + human_vals.std()
-        if not spread_sum:                      # zero or NaN: can't measure
+        if pd.isna(spread_sum) or spread_sum == 0:               # zero or NaN: can't measure
             separations.append(0.0)
             continue
         gap = sign[feature] * (ai_vals.mean() - human_vals.mean())
@@ -228,3 +232,28 @@ def fit_weights(examples: pd.DataFrame) -> tuple[float, float, float]:
     if total <= 0:
         return DEFAULT_WEIGHTS
     return tuple(s / total for s in separations)
+
+
+_calibration = None   # (cutoffs, weights), or None if not enough data
+
+
+def enough_data(examples: pd.DataFrame) -> bool:
+    counts = examples["label"].value_counts()
+    return all(counts.get(label, 0) >= MIN_EXAMPLES_PER_LABEL for label in LABELS)
+
+
+def get_calibration():
+    """Fit once and reuse. Returns None until there is enough labeled data."""
+    global _calibration
+    if _calibration is None:
+        examples = load_confirmed_examples()
+        if not enough_data(examples):
+            return None                     # don't cache: try again next time
+        _calibration = (fit_calibration(examples), fit_weights(examples))
+    return _calibration
+
+
+def refresh_calibration() -> None:
+    """Clear the cache so the next score refits on the latest labels."""
+    global _calibration
+    _calibration = None

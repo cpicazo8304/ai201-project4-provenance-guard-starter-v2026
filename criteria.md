@@ -128,3 +128,36 @@ Bad input can break the model or create meaningless results. A clear limit preve
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+
+# Unit 9 Criteria
+
+## 1 False Positives
+
+Human writing should get called AI only 3 of 25 examples.
+
+
+**Why this target:**
+It is very detrimental to label someone's actual work as AI. This could lose trust in the product/program. For this reason, want to keep it very low. Even with the system extension, this should hold true.
+
+## 2 Admin check
+100% of admin actions should have valid ID.
+
+**Why this target:** Every admin action such as updating the dataset needs a valid ID, so there shouldn't be missing ID or invalid IDs.
+
+
+## 3 Every dataset examples contains a label and source
+
+There are 25 examples for AI and human. Each one in the dataset should have a label correspond one of the two and contain a source of how it was confirmed.
+
+**Why:** The dataset is used to calibrate the stylometry score which depends on confirmed AI and human examples. If it is not confirmed, then there will be errors in the calculation in terms of not being able to calculate AND because of bias in the calibration numbers. If we include labels the system decide on its own (right or wrong) and don't confirm with a human reviewer or update based on an appeal, then the system will just assume its labels are correct and calibrate based on that. 
+
+
+## 4 Score Spread
+
+Clearly AI text scores at least 0.20 higher than clearly human text on average.
+
+**Why this target:**
+There needs to be a large enough gap between clearly AI and clearly human. Don't want them mixing together, which could lead to misclassifications. 
+
+## 5

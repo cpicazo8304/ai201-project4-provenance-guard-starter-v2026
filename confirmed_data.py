@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Mapping
 
 import pandas as pd
+import numpy as np
 
 
 DATASET_PATH = Path(__file__).resolve().parent / "data" / "data.csv"
@@ -16,10 +17,15 @@ DATASET_COLUMNS = (
     "content_id",
     "text",
     "label",
-    "label_source",
-    "confirmed_at",
-    *SCORE_COLUMNS,
+    "labermed_at",
+    *SCOREl_source",
+    "confi_COLUMNS,
 )
+DEFAULT_CALIBRATION = {
+    "spread": {"spread_cutoff": 0.8},
+    "ttr":    {"ttr_base": 0.75, "ttr_span": 0.20},   # redo if you change the window size
+    "punc":   {"punct_div": 15},
+}
 MIN_EXAMPLES_PER_LABEL = 5
 
 _write_lock = threading.Lock()
@@ -39,6 +45,7 @@ def _validate_examples(examples: pd.DataFrame) -> None:
 
 def add_confirmed_example(
     content_id: str,
+    admin_id: str,
     text: str,
     label: str,
     label_source: str,
@@ -51,8 +58,11 @@ def add_confirmed_example(
     for preserving the history of earlier decisions and appeal events.
     """
     content_id = str(content_id).strip()
+    admin_id = str(admin_id).strip()
     if not content_id:
         raise ValueError("content_id must not be empty")
+    if not admin_id:
+        raise ValueError("admin_id must not be empty")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text must be a non-empty string")
     if label not in LABELS:
@@ -71,6 +81,7 @@ def add_confirmed_example(
 
     row = {
         "content_id": content_id,
+        "admin_id": admin_id,
         "text": text,
         "label": label,
         "label_source": label_source,
@@ -132,122 +143,88 @@ def load_confirmed_examples(path: str | Path = DATASET_PATH) -> pd.DataFrame:
     return examples.loc[:, DATASET_COLUMNS]
 
 
-def summarize_by_label(examples: pd.DataFrame) -> pd.DataFrame:
-    """Compare raw feature ranges by label before choosing any cutoffs."""
-    _validate_examples(examples)
-    if examples.empty:
-        return pd.DataFrame()
-
-    # Counts and medians expose both weak features and class overlap; a mean
-    # alone can hide a few unusually long or punctuation-heavy texts.
-    return examples.groupby("label")[list(FEATURE_COLUMNS)].agg(
-        ["count", "median", "mean", "min", "max"]
-    )
-
-
 def fit_calibration(examples: pd.DataFrame) -> dict:
     """Derive exploratory per-feature cutoffs from labeled training examples.
-
-    The midpoint between class medians is transparent and easy to inspect,
-    but it is not a robust production model. Fit only on training data; use a
-    separate held-out set with evaluate_calibration().
     """
     _validate_examples(examples)
+    feature_cutoffs = {f: dict(v) for f, v in DEFAULT_CALIBRATION.items()}
+
     counts = examples["label"].value_counts()
     if any(counts.get(label, 0) < MIN_EXAMPLES_PER_LABEL for label in LABELS):
-        raise ValueError(
-            f"Need at least {MIN_EXAMPLES_PER_LABEL} examples of each label "
-            "to fit exploratory cutoffs"
-        )
+        return feature_cutoffs  # not enough data: all defaults
 
-    feature_cutoffs = {}
     for feature in FEATURE_COLUMNS:
         available = examples.dropna(subset=[feature])
         human_values = available.loc[available["label"] == "human", feature]
         ai_values = available.loc[available["label"] == "ai", feature]
+
         if min(len(human_values), len(ai_values)) < MIN_EXAMPLES_PER_LABEL:
-            continue
+            continue  # keep default
 
-        human_median = float(human_values.median())
-        ai_median = float(ai_values.median())
-        if human_median == ai_median:
-            continue
+        # Direction check: spread and ttr higher for human, punc higher for AI.
+        expected_human_higher = feature in ("spread", "ttr")
+        if (human_values.mean() > ai_values.mean()) != expected_human_higher:
+            continue  # reversed or flat: keep default
 
-        feature_cutoffs[feature] = {
-            "threshold": (human_median + ai_median) / 2,
-            "ai_direction": "higher" if ai_median > human_median else "lower",
-            "human_median": human_median,
-            "ai_median": ai_median,
-        }
-
-    if not feature_cutoffs:
-        raise ValueError("No feature has distinct, sufficiently sampled class medians")
-
-    return {
-        "method": "midpoint_of_class_medians",
-        "training_examples": int(len(examples)),
-        "features": feature_cutoffs,
-    }
-
-
-def evaluate_calibration(examples: pd.DataFrame, calibration: dict) -> dict:
-    """Report held-out accuracy and human false-positive rate for cutoffs.
-
-    Each usable feature casts one vote. Ties remain 'unsure' rather than being
-    forced into a human or AI label, since uncertainty is a valid outcome here.
-    """
-    _validate_examples(examples)
-    features = calibration.get("features", {})
-    if not features:
-        raise ValueError("calibration has no feature cutoffs")
-    if examples.empty:
-        raise ValueError("examples must not be empty")
-
-    labels = ("human", "ai", "unsure")
-    confusion = {actual: {predicted: 0 for predicted in labels} for actual in LABELS}
-    predictions = []
-
-    for _, row in examples.iterrows():
-        ai_votes = human_votes = 0
-        for feature, cutoff in features.items():
-            value = row.get(feature)
-            if pd.isna(value):
+        if feature == "spread":
+            feature_cutoffs[feature] = {
+                "spread_cutoff": np.percentile(human_values, 90)
+            }
+        elif feature == "ttr":
+            ttr_base = np.percentile(ai_values, 10)
+            ttr_span = np.percentile(human_values, 90) - ttr_base
+            if ttr_span <= 0:
+                continue  # groups overlap too much: keep default
+            feature_cutoffs[feature] = {"ttr_base": ttr_base, "ttr_span": ttr_span}
+        elif feature == "punc":
+            punct_div = np.percentile(ai_values, 90)
+            if punct_div <= 0:
                 continue
-            is_ai = (
-                value >= cutoff["threshold"]
-                if cutoff["ai_direction"] == "higher"
-                else value <= cutoff["threshold"]
-            )
-            ai_votes += int(is_ai)
-            human_votes += int(not is_ai)
+            feature_cutoffs[feature] = {"punct_div": punct_div}
 
-        predicted = (
-            "ai" if ai_votes > human_votes
-            else "human" if human_votes > ai_votes
-            else "unsure"
-        )
-        actual = row["label"]
-        confusion[actual][predicted] += 1
-        predictions.append({
-            "content_id": row.get("content_id"),
-            "actual": actual,
-            "predicted": predicted,
-        })
+    return feature_cutoffs
 
-    total = len(predictions)
-    human_count = sum(confusion["human"].values())
-    ai_count = sum(confusion["ai"].values())
-    return {
-        "count": total,
-        "accuracy": sum(confusion[label][label] for label in LABELS) / total,
-        "human_false_positive_rate": (
-            confusion["human"]["ai"] / human_count if human_count else None
-        ),
-        # An AI example labeled human or unsure was not successfully detected.
-        "ai_miss_rate": (
-            (confusion["ai"]["human"] + confusion["ai"]["unsure"]) / ai_count
-            if ai_count else None
-        ),
-        "confusion": confusion,
-        "predictions": predictions,
-    }
+
+def bound(x: float) -> float:
+    return min(max(x, 0.0), 1.0)
+
+
+def calculate_transformed_values(spread, ttr, punct, cutoffs) -> tuple[float, float, float]:
+    """Turn raw measures into 0-1 transformed sub-scores (higher = more AI-like)."""
+    # NaN spread (fewer than two sentences) -> neutral
+    if spread != spread:
+        spread_transformed = 0.5
+    else:
+        spread_transformed = bound(1.0 - spread / cutoffs["spread"]["spread_cutoff"])
+
+    ttr_transformed = bound(
+        1.0 - (ttr - cutoffs["ttr"]["ttr_base"]) / cutoffs["ttr"]["ttr_span"]
+    )
+    punct_transformed = bound(punct / cutoffs["punc"]["punct_div"])
+
+    return spread_transformed, ttr_transformed, punct_transformed
+
+
+DEFAULT_WEIGHTS = (0.5, 0.3, 0.2)
+
+def fit_weights(examples: pd.DataFrame) -> tuple[float, float, float]:
+    """Weight each feature by how well its raw values separate human from AI."""
+    is_ai = examples["label"] == "ai"
+    # direction: spread/ttr are higher for human, punc is higher for AI
+    sign = {"spread": -1, "ttr": -1, "punc": 1}
+
+    separations = []
+    for feature in ["spread", "ttr", "punc"]:
+        ai_vals = examples.loc[is_ai, feature].dropna()
+        human_vals = examples.loc[~is_ai, feature].dropna()
+        spread_sum = ai_vals.std() + human_vals.std()
+        if not spread_sum:                      # zero or NaN: can't measure
+            separations.append(0.0)
+            continue
+        gap = sign[feature] * (ai_vals.mean() - human_vals.mean())
+        separations.append(max(gap, 0.0) / spread_sum)   # reversed feature -> 0
+
+    total = sum(separations)
+    if total <= 0:
+        return DEFAULT_WEIGHTS
+    return tuple(s / total for s in separations)

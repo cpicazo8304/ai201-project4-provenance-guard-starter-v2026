@@ -303,6 +303,61 @@ def appeal():
         }), 400
 
 
+@app.post("/confirm")
+def confirm():
+    payload = request.get_json(silent=True) or {}
+    try:
+        content_id = payload["content_id"]
+        admin_id = payload["admin_id"]
+
+        # only admin can do this request
+        if admin_id not in config.ELIGIBLE_ADMINS:
+            return jsonify({
+                "error": "invalid_admin",
+                "message": "You aren't an admin and can't amend dataset.",
+                "you_sent": payload
+            }), 404
+
+        text = payload["text"]
+        label = payload["label"]
+        label_source = payload["label_source"]
+        scores = payload.get("scores", {})
+
+        confirmed_data_path = config.CONFIRMED_DATA_PATH
+        confirmed_data_path.parent.mkdir(parents=True, exist_ok=True)
+
+        from confirmed_data import add_confirmed_example
+        add_confirmed_example(
+            path=confirmed_data_path,
+            content_id=content_id,
+            admin_id=admin_id,
+            text=text,
+            label=label,
+            label_source=label_source,
+            scores=scores
+        )
+
+        audit.log_add_data(
+            content_id=content_id,
+            admin_id=admin_id,
+            label=label,
+            label_source=label_source,
+            scores=scores,
+            text=text,
+        )
+
+        return jsonify({
+            "message": "Label confirmed successfully.",
+            "content_id": content_id,
+        })
+    except Exception as e:
+        return jsonify({
+            "error": "invalid_payload",
+            "message": str(e),
+            "you_sent": payload,
+        }), 400
+
+
 # ── Already works ─────────────────────────────────────────────────────────────
 
 @app.get("/log")

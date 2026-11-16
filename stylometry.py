@@ -33,7 +33,9 @@ anything together:
 import re
 import statistics
 import traceback
+import math
 import audit
+import confirmed_data
 
 
 def sentences(text: str) -> list[str]:
@@ -116,61 +118,50 @@ def punctuation_density(text: str) -> float:
 
 # ── Combining them ───────────────────────────────────────────────────────────
 
-def bound(x: float) -> float:
-    return min(max(x, 0.0), 1.0)
+def style_signal(
+    text: str,
+    content_id: str,
+    creator_id: str,
+) -> tuple[float, float | None, float | None, float | None]:
+    """Return the style score plus raw spread, TTR, and punctuation values.
 
-
-def style_signal(text: str, content_id: str, creator_id: str) -> tuple[float, float, float, float]:
-    """0-1, HIGHER = MORE LIKELY AI. Each measure becomes an AI-ness sub-score
-    on 0-1 first, so none wins just because its raw numbers are bigger."""
-    # No words means no evidence either way: stay neutral.
+    Confirmed examples determine feature directions, cutoffs, and weights.
+    Until the dataset has enough labeled examples, style contributes no
+    evidence.
+    """
     if not words(text):
-        return 0.5, 0.5, 0.5, 0.5
+        return 0.5, None, None, None
 
     try:
         cv = sentence_length_spread(text)
         ttr = type_token_ratio(text)
         punct = punctuation_density(text)
+        raw_spread = cv if math.isfinite(cv) else None
 
+        # Raw measurements, logged once with the text.
         audit.log_stylometry(
-            content_id=content_id, 
+            content_id=content_id,
             creator_id=creator_id,
-            flipped=False,
-            sentence_length_spread=cv,
-            type_token_ratio=ttr,
-            punctuation_density=punct,
+            stage="raw",
+            spread_score=raw_spread,
+            ttr_score=ttr,
+            punct_score=punct,
             text=text,
         )
 
-        
-        # NaN (fewer than two sentences) -> neutral sub-score
-        spread_ai = 0.5 if cv != cv else bound(1.0 - cv / 0.8)         # flipped
-        # Window-based TTR sits higher (~0.7-0.95) than whole-text TTR, so the
-        # baseline/span here are placeholders: recalibrate on your own samples.
-        ttr_ai = bound(1.0 - (ttr - 0.75) / 0.20)   # flipped
-        # Density is per 100 words (~5-15 typical), so divide by 15, not 0.15.
-        # Direction (more punctuation = more AI) is an unverified assumption.
-        punct_ai = bound(punct / 15) 
-        
-        main_score =  round(0.7 * spread_ai + 0.3 * ttr_ai, 4)
-
-        audit.log_stylometry(
-            content_id=content_id, 
-            creator_id=creator_id,
-            flipped=True,
-            sentence_length_spread=cv,
-            type_token_ratio=ttr,
-            punctuation_density=punct,
-            text=text,
-            main_score=main_score,
+        examples = confirmed_data.load_confirmed_examples()
+        cutoffs = confirmed_data.fit_calibration(examples=examples)
+        spread_transformed, ttr_transformed, punct_transformed = confirmed_data.calculate_transformed_values(
+            raw_spread, ttr, punct, cutoffs
         )
+        spread_weight, ttr_weight, punct_weight = confirmed_data.fit_weights(examples=examples)
 
-        return main_score, spread_ai, ttr_ai, punct_ai
+        main_score = round(spread_weight * spread_transformed + ttr_weight * ttr_transformed + punct_weight * punct_transformed, 4)
+
+        return main_score, raw_spread, ttr, punct
     except Exception:
-        # Log the real error instead of hiding it, then fall back to neutral.
         traceback.print_exc()
-        return 0.5, 0.5, 0.5, 0.5  # neutral fallback
-
+        return 0.5, None, None, None
 
 if __name__ == "__main__":
     import sys

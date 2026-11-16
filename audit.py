@@ -34,7 +34,7 @@ def _now() -> str:
 def log_stylometry(
     content_id: str,
     creator_id: str,
-    flipped: bool,
+    stage: str,
     spread_score: float | None = None,
     ttr_score: float | None = None,
     punct_score: float | None = None,
@@ -55,7 +55,7 @@ def log_stylometry(
         "content_id": content_id,
         "creator_id": creator_id,
         "text": text,
-        "flipped": flipped,
+        "stage": stage,
         "spread_score": spread_score,
         "ttr_score": ttr_score,
         "punct_score": punct_score,
@@ -65,16 +65,23 @@ def log_stylometry(
     return _append(entry)
 
 
-def add_row(path, text, label, spread, ttr, punct):
-    row = pd.DataFrame([{
+def log_add_data(
+    content_id: str,
+    admin_id: str,
+    label: str,
+    label_source: str,
+    scores: List[float],
+    text: str
+) -> dict:
+    entry = {
+        "timestamp": _now(),
+        "content_id": content_id,
+        "admin_id": admin_id,
+        "label": label,
+        "scores": scores,
         "text": text,
-        "label": label,        # "human" or "ai"
-        "spread": spread,
-        "ttr": ttr,
-        "punct": punct,
-    }])
-    # write the header only if the file doesn't exist yet
-    row.to_csv(path, mode="a", header=not os.path.exists(path), index=False)
+    }
+    return _append(entry)
 
 
 def log_decision(

@@ -11,6 +11,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 
+# data including human and AI examples
+CONFIRMED_DATA_PATH = ROOT / "data" / "data.csv"
+
+ELIGIBLE_ADMINS = [
+    "412b59bcbe0f", 
+    "0d679ddd57db", 
+    "8317d0f57979", 
+    "d08ef8ddb1ef",
+    "4407868d0e64",
+]
+
 
 # ─── The service ─────────────────────────────────────────────────────────────
 
